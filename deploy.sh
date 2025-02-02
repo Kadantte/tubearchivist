@@ -18,20 +18,24 @@ set -e
 
 function sync_blackhole {
 
-    host="blackhole.local"
+    host="blackhole.lan"
     
     rsync -a --progress --delete-after \
         --exclude ".git" \
         --exclude ".gitignore" \
         --exclude "**/cache" \
         --exclude "**/__pycache__/" \
+        --exclude "**/.pytest_cache/" \
+        --exclude "**/static/" \
+        --exclude "**/node_modules/" \
+        --exclude "**/.env" \
         --exclude ".venv" \
         --exclude "db.sqlite3" \
         --exclude ".mypy_cache" \
         . -e ssh "$host":tubearchivist
 
-    ssh "$host" 'docker build -t bbilly1/tubearchivist --build-arg TARGETPLATFORM="linux/amd64" tubearchivist'
-    ssh "$host" 'docker compose up -d'
+    ssh "$host" 'docker build --build-arg INSTALL_DEBUG=1 -t bbilly1/tubearchivist:unstable tubearchivist'
+    ssh "$host" 'docker compose -f docker/docker-compose.yml up -d'
 
 }
 
@@ -51,6 +55,9 @@ function sync_test {
         --exclude "**/cache" \
         --exclude "**/__pycache__/" \
         --exclude "**/.pytest_cache/" \
+        --exclude "**/static/" \
+        --exclude "**/node_modules/" \
+        --exclude "**/.env" \
         --exclude ".venv" \
         --exclude "db.sqlite3" \
         --exclude ".mypy_cache" \
@@ -92,12 +99,12 @@ function validate {
     echo "running black"
     black --force-exclude "migrations/*" --diff --color --check -l 79 "$check_path"
     echo "running codespell"
-    codespell --skip="./.git,./.venv,./package.json,./package-lock.json,./node_modules,./.mypy_cache" "$check_path"
+    codespell --skip="./.git,./.venv,./package.json,./package-lock.json,**/node_modules,./.mypy_cache,**/static/volume" "$check_path"
     echo "running flake8"
-    flake8 "$check_path" --exclude "migrations,.venv" --count --max-complexity=10 \
+    flake8 "$check_path" --exclude "migrations,.venv,frontend" --count --max-complexity=10 \
         --max-line-length=79 --show-source --statistics
     echo "running isort"
-    isort --skip "migrations" --skip ".venv" --check-only --diff --profile black -l 79 "$check_path"
+    isort --skip "migrations" --skip ".venv" --skip "frontend" --check-only --diff --profile black -l 79 "$check_path"
     printf "    \n> all validations passed\n"
 
 }
